@@ -1,0 +1,26 @@
+<RCC>
+  <qresource prefix="fondo">
+    <file>Imagen4.jpg</file>
+  </qresource>
+  <qresource prefix="iconos">
+    <file>LOGO_ardu_ucm.png</file>
+    <file>auto_peq.png</file>
+    <file>red_b_peq.png</file>
+    <file>manual_peq.png</file>
+    <file>Arduino 1.png</file>
+    <file>green_b_peq.png</file>
+    <file>stop.png</file>
+    <file>pause.png</file>
+    <file>play.png</file>
+    <file>export.png</file>
+    <file>auto_log.png</file>
+    <file>manual_log.png</file>
+    <file>logo_ucm.png</file>
+    <file>logo.png</file>
+    <file>control.emf.jpg</file>
+    <file>configuracion.png</file>
+    <file>control_arduino.png</file>
+    <file>control_panel.png</file>
+    <file>toma_de_datos.png</file>
+  </qresource>
+</RCC>
