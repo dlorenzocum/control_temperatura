@@ -3,7 +3,7 @@
 import json
 import sys
 
-from PySide6.QtCore import QCoreApplication
+from PySide6.QtCore import QCoreApplication, QTimer
 from PySide6.QtWidgets import QApplication, QWidget, QMainWindow, QDialog, QMessageBox, QSplashScreen
 from PySide6 import QtCore
 from PySide6.QtGui import QPixmap, Qt
@@ -131,7 +131,7 @@ class UI(QMainWindow, Ui_MainWindow):
         self.data = {}
 
         self.datos_sesion=[]
-
+        self.buffer = ""
         # win_ hago referencia a las pantallas de diálogo
 
         # Creo la pantalla de información del arduino
@@ -176,6 +176,10 @@ class UI(QMainWindow, Ui_MainWindow):
         # Pantalla de no conexión
 
         self.win_no_conexion = Diagl_no_conexion()
+        
+        self.timer = QTimer(self)
+        self.timer.timeout.connect(self.verificar_conexion_arduino)
+        self.timer.start(1000)  # 5000 ms = 5 segundos
 
     def _win_info_arduino(self):
         self.win_infoarduino.show()
@@ -224,7 +228,6 @@ class UI(QMainWindow, Ui_MainWindow):
     def set_temperatura(self):
         """Envía el set de temperatua en modo automático al arduino"""
         self.temperaturaSET = self.doubleSpinBox_temp.value()
-        print(self.temperaturaSET)
         if self.hw.connect:
             self.hw.setSp(self.temperaturaSET)
 
@@ -356,46 +359,54 @@ class UI(QMainWindow, Ui_MainWindow):
         """Número de acciones en paralelo"""
         worker = Worker(self.getDatos)
         self.threadpool.start(worker)
-        
-    def gestionarDatos(self, datos_arduino):
-        """Gestiona los datos que llegan de Arduino"""
+    
+    def gestionarDatos(self,data):
+
+        self.buffer += data
         try:
-            new_data = json.loads(datos_arduino)
-            new_data['time'] = horaISO()  # Agrego valores al nuevo diccionario
-            new_data_series = pd.Series(new_data)
-            self.df_datos_sesion = pd.concat([self.df_datos_sesion, new_data_series.to_frame().T], ignore_index=True)
-            self.showData(new_data)
-            print(new_data_series)
-            self.df_datos_sesion.to_csv(absPath(diaISO()) + '/' + diaISO() +'_'+ self.horaConexion+'_'+'datos.csv', index=False)
+            while True:
+                start = self.buffer.find("{")
+                end = self.buffer.find("}", start) + 1
+                if start == -1 or end == 0:
+                    break
+                json_data = self.buffer[start:end]
+                self.buffer = self.buffer[end:]
+                datos_arduino = json.loads(json_data)
+                datos_arduino['time'] = horaISO()
+                new_data_series = pd.Series(datos_arduino)
+                self.df_datos_sesion = pd.concat([self.df_datos_sesion, new_data_series.to_frame().T], ignore_index=True)
+                self.showData(datos_arduino)
+                print(new_data_series)
+                self.df_datos_sesion.to_csv(absPath(diaISO()) + '/' + diaISO() +'_'+ self.horaConexion+'_'+'datos.csv', index=False)
+        except json.JSONDecodeError as e:
+            print(f"Error de JSON: {e}")
+    
         
-        except json.JSONDecodeError:
-            print('Error al decodificar JSON')
-        except Exception as e:
-            print(f'Error al gestionar datos: {e}')
+
+    def verificar_conexion_arduino(self):
+        
+        if self.hw.verificar_conexion():
+            print('Verificando conexión: ok')
+        else:
+            print("Arduino desconectado. Intentando reconectar...")
+            self.hw.reconectar()
+            self.hw.connect = False
+            self.label_5.setPixmap(QPixmap(u":/iconos/red_b_peq.png"))
+            self.win_graficos.label_6.setPixmap(QPixmap(u":/iconos/red_b_peq.png"))
+            self.win_conectar.status_label.setText("Arduino desenchufado")
+        
+    
             
     def getDatos(self):
         """Pide los datos a Arduino de manera constante cada o.5 s"""
         #self.hw.connect = True
         while self.hw.connect:
-            try:
-                self.data = self.hw.getData()
-                time.sleep(0.5)
-                self.gestionarDatos(self.data)
+            self.data = self.hw.getData()
+            time.sleep(0.5)
+            self.gestionarDatos(self.data)
+            
                 
-            except Exception as error:
-                self.hw.connect = False
-                self.label_5.setPixmap(QPixmap(u":/iconos/red_b_peq.png"))
-                self.win_graficos.label_6.setPixmap(QPixmap(u":/iconos/red_b_peq.png"))
-                self.win_conectar.status_label.setText("Arduino desenchufado")
 
-        return
-
-    #def _graficar(self):
-      #  if self.hw.connect:
-       #     worker2 = Worker(self.plotDatos)
-        #    self.threadpool.start(worker2)
-        #else:
-         #   self.no_conexion()
 
     def plotDatos(self):
         #self.graficar = True
@@ -412,6 +423,7 @@ class UI(QMainWindow, Ui_MainWindow):
     def _graficar_star(self):
         self.graficar = True
         self.win_graficos.label_8.setPixmap(QPixmap(u":/iconos/green_b_peq.png"))
+    
     def _exportar_datos(self):
         self.df_plot.to_csv(absPath('dat1.csv'))
 
@@ -449,11 +461,13 @@ class UI(QMainWindow, Ui_MainWindow):
             event.accept()
         else:
             event.ignore()
+    
     def stopControl(self):
         if self.hw.connect:
             self.hw.stop()
             self.hw.connect = False
             self.win_conectar.status_label.setText("Control: OFF")
+            self.hw.disconnect()
         else:
             self.no_conexion()
 

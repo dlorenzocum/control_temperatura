@@ -4,27 +4,6 @@ from serial.tools import list_ports
 import json
 from helpers import absPath
 
-arduinos = [('USB VID:PID=16D0:0613', 'Arduino Uno'),
-            ('USB VID:PID=1A86:7523', 'NHduino'),
-            ('USB VID:PID=2341:8036', 'Arduino Leonardo'),
-            ('USB VID:PID=2A03', 'Arduino.org device'),
-            ('USB VID:PID', 'unknown device'),
-            ]
-
-
-def find_arduino(port=''):
-    """Locates Arduino and returns port and device.
-    Si el arduno está concetado devuelve el tipo de arduino y el pueto al que está concetado"""
-    comports = [tuple for tuple in list_ports.comports() if port in tuple[0]]
-    for port, desc, hwid in comports:
-        for identifier, arduino in arduinos:
-            if hwid.startswith(identifier):
-                return arduino, port
-    # print('--- Serial Ports ---')
-    # for port, desc, hwid in list_ports.comports():
-    # print(port, desc, hwid)
-    return None, None
-
 
 class Arduino:
     """
@@ -42,17 +21,38 @@ class Arduino:
     def __init__(self):
         self.connect = False
         self.baud = 115200
-        self.arduino, self.port= find_arduino()
+        self.arduino, self.port= self.find_arduino()
         self.version = None
         if self.port is None:
             self.arduino_no_encontrado()
-
+        
+        self.hw = None
+            
+    def find_arduino(self, port=''):
+        arduinos = [('USB VID:PID=16D0:0613', 'Arduino Uno'),
+                ('USB VID:PID=1A86:7523', 'NHduino'),
+                ('USB VID:PID=2341:8036', 'Arduino Leonardo'),
+                ('USB VID:PID=2A03', 'Arduino.org device'),
+                ('USB VID:PID', 'unknown device'),
+                ('USB VID:PID=2341:0058', 'Arduino NANO every')
+                ]
+    
+        """Locates Arduino and returns port and device. Si el arduno está concetado devuelve el 
+        tipo de arduino y el pueto al que está concetado"""
+        
+        comports = [tuple for tuple in list_ports.comports() if port in tuple[0]]
+        for port, desc, hwid in comports:
+            for identifier, arduino in arduinos:
+                if hwid.startswith(identifier):
+                    return arduino, port
+        return None, None
+        
     def conectar_arduino(self):
         """Hardware connect"""
         try:
             self.hw = serial.Serial(self.port, self.baud, timeout=2) # Crea una istnacia de la clase Serial
             self.hw.reset_output_buffer() #Flush input buffer, discarding all its contents.
-            time.sleep(2) # Espera 2 segundos para que concete
+            time.sleep(2) # Espera 2 segundos para que conecte
             self.connect = True
             self.version = self.getVersion()
         except Exception as error:
@@ -63,10 +63,31 @@ class Arduino:
     def reconectar(self):
         """Este método busca de nuevo el puerto y el arduino concetados"""
         if self.port is None:
-            self.arduino, self.port = find_arduino()
+            self.arduino, self.port = self.find_arduino()
             if self.port is None:
                 self.arduino_no_encontrado()
 
+
+    def disconnect(self):
+        """Desconecta el arduino"""
+        self.hw.close()
+        self.connect = False
+    
+    def verificar_conexion(self):
+        """Verifica si el Arduino sigue conectado."""
+        if self.hw is None:
+            self.arduino_no_encontrado()
+            return False
+        try:
+            self.hw.in_waiting  # Verifica si la conexión sigue activa
+            return True
+        except (OSError, serial.SerialException):
+                self.connect = False
+                self.arduino_no_encontrado()
+                return False
+    
+    def getPort(self):
+        return self.port
 
     def arduino_no_encontrado(self):
         print("Arduino no encontrado")
@@ -81,12 +102,13 @@ class Arduino:
         """Envía acción al Serial del arduino.
         Utiliza el métdo de la clase Serial que es write()"""
         self.hw.write((msg + '\n').encode('utf-8'))
-        time.sleep(0.0002)
+        time.sleep(0.002)
 
     def recive(self):
         """Recibe un dato del serial del Arduino"""
         data = self.hw.readline().decode('utf-8').replace('\r\n', '')
         return data
+  
 
     def getVersion(self):
         self.send("VER")
@@ -97,8 +119,8 @@ class Arduino:
     def getData(self):
         self.send("B")
         data = self.recive()
-        j_data = json.loads(data)
-        return j_data
+        #j_data = json.loads(data)
+        return data
 
     def getT1(self):
         self.send("T1")
@@ -133,6 +155,8 @@ class Arduino:
         self.send("KCS " + str(kc))
         self.send("KIS " + str(KI))
         self.send("KDS " + str(KD))
+        data = self.recive()
+        return data
 
     def setKc(self, kc):
         self.send("KCS " + str(kc))
@@ -144,7 +168,7 @@ class Arduino:
         self.send("KIS " + str(KI))
 
     def setSp(self, TSP):
-        self.send("T1S"+' '+ str(TSP))
+        self.send("T "+ str(TSP))
 
     def setQ1(self, Q1):
         self.send("Q1 " + str(Q1))
