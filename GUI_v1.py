@@ -35,7 +35,6 @@ class WorkerSignals(QtCore.QObject):
     error = QtCore.Signal(tuple)
     results = QtCore.Signal(object)
 
-
 class Worker(QtCore.QRunnable):
     def __init__(self, fn): # Aquí añado la función que quiero ejecutar como fn
         super().__init__()
@@ -50,7 +49,6 @@ class Worker(QtCore.QRunnable):
 
 
         #self.signals.start_control.emit()
-
 
 class InfoArduino(QWidget, Ui_Dialog):
     def __init__(self):
@@ -179,7 +177,7 @@ class UI(QMainWindow, Ui_MainWindow):
         
         self.timer = QTimer(self)
         self.timer.timeout.connect(self.verificar_conexion_arduino)
-        self.timer.start(1000)  # 5000 ms = 5 segundos
+        self.timer.start(5000)  # 5000 ms = 5 segundos
 
     def _win_info_arduino(self):
         self.win_infoarduino.show()
@@ -361,7 +359,6 @@ class UI(QMainWindow, Ui_MainWindow):
         self.threadpool.start(worker)
     
     def gestionarDatos(self,data):
-
         self.buffer += data
         try:
             while True:
@@ -374,6 +371,8 @@ class UI(QMainWindow, Ui_MainWindow):
                 datos_arduino = json.loads(json_data)
                 datos_arduino['time'] = horaISO()
                 new_data_series = pd.Series(datos_arduino)
+                if self.graficar:
+                    self.plot(new_data_series)
                 self.df_datos_sesion = pd.concat([self.df_datos_sesion, new_data_series.to_frame().T], ignore_index=True)
                 self.showData(datos_arduino)
                 print(new_data_series)
@@ -381,8 +380,6 @@ class UI(QMainWindow, Ui_MainWindow):
         except json.JSONDecodeError as e:
             print(f"Error de JSON: {e}")
     
-        
-
     def verificar_conexion_arduino(self):
         
         if self.hw.verificar_conexion():
@@ -394,27 +391,20 @@ class UI(QMainWindow, Ui_MainWindow):
             self.label_5.setPixmap(QPixmap(u":/iconos/red_b_peq.png"))
             self.win_graficos.label_6.setPixmap(QPixmap(u":/iconos/red_b_peq.png"))
             self.win_conectar.status_label.setText("Arduino desenchufado")
-        
-    
-            
+                  
     def getDatos(self):
-        """Pide los datos a Arduino de manera constante cada o.5 s"""
+        """Pide los datos a Arduino de manera constante cada 1 s"""
         #self.hw.connect = True
         while self.hw.connect:
             self.data = self.hw.getData()
-            time.sleep(0.5)
+            time.sleep(1)
             self.gestionarDatos(self.data)
-            
-                
-
-
+                       
     def plotDatos(self):
-        #self.graficar = True
         if self.graficar:
             self.datos_export =pd.DataFrame(self.data, index = [1])
             self.plot(self.data)
             self.df_plot=pd.concat([self.df_plot, self.datos_export])
-
 
     def _graficar_pause(self):
         self.win_graficos.label_8.setPixmap(QPixmap(u":/iconos/red_b_peq.png"))
@@ -443,7 +433,7 @@ class UI(QMainWindow, Ui_MainWindow):
         self.win_graficos.lcdNumber_temp.display(data['T1'])
         self.win_graficos.lcdNumber_valve.display(data['Q1'])
 
-        self.plotDatos()
+        #.self.plotDatos()
 
     def closeEvent(self, event):
         close = QMessageBox.question(self, "QUIT", "¿Seguro qué deseas cerrar la sesión?",

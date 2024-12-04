@@ -3,6 +3,7 @@ import time
 from serial.tools import list_ports
 import json
 from helpers import absPath
+import collections
 
 
 class Arduino:
@@ -50,7 +51,7 @@ class Arduino:
     def conectar_arduino(self):
         """Hardware connect"""
         try:
-            self.hw = serial.Serial(self.port, self.baud, timeout=2) # Crea una istnacia de la clase Serial
+            self.hw = serial.Serial(self.port, self.baud, timeout=0.5) # Crea una istnacia de la clase Serial
             self.hw.reset_output_buffer() #Flush input buffer, discarding all its contents.
             time.sleep(2) # Espera 2 segundos para que conecte
             self.connect = True
