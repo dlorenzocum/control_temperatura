@@ -375,7 +375,6 @@ class UI(QMainWindow, Ui_MainWindow):
                     self.plot(new_data_series)
                 self.df_datos_sesion = pd.concat([self.df_datos_sesion, new_data_series.to_frame().T], ignore_index=True)
                 self.showData(datos_arduino)
-                print(new_data_series)
                 self.df_datos_sesion.to_csv(absPath(diaISO()) + '/' + diaISO() +'_'+ self.horaConexion+'_'+'datos.csv', index=False)
         except json.JSONDecodeError as e:
             print(f"Error de JSON: {e}")
